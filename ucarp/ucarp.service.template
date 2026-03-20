@@ -1,0 +1,17 @@
+[Unit]
+Description=UCARP IP Failover
+After=network.target
+
+[Service]
+Type=forking
+User=root
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+{{SKEW}}
+ExecStart=/usr/sbin/ucarp --interface=ens33 --srcip={{HOST_IP}} --vhid={{UCARP_VHID}} --passfile=/etc/ucarp/ucarp.pass --addr={{VIP}} --upscript=/usr/local/bin/vip-up.sh --downscript=/usr/local/bin/vip-down.sh --preempt --advbase=1 --deadratio=2 {{PRIORITY}} --daemonize
+ExecStop=/usr/bin/pkill -f "ucarp.*vhid={{UCARP_VHID}}"
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
