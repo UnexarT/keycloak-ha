@@ -1,0 +1,11 @@
+# docker-compose-haproxy.yml
+version: '3.8'
+
+services:
+  haproxy:
+    image: haproxy:latest
+    container_name: haproxy
+    network_mode: host
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    restart: unless-stopped

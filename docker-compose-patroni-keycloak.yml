@@ -1,0 +1,58 @@
+# docker-compose-patroni-keycloak.yml
+version: '3.8'
+
+services:
+  patroni:
+    image: ghcr.io/zalando/spilo:16
+    container_name: patroni
+    environment:
+      - SCOPE=keycloak_db
+      - ETCD_HOST=${VM3_IP}:2379
+      - PATRONI_NAME=${HOSTNAME}
+      - PATRONI_RESTAPI_LISTEN=0.0.0.0:8008
+      - PATRONI_RESTAPI_CONNECT_ADDRESS=${HOST_IP}:8008
+      - PATRONI_POSTGRESQL_LISTEN=0.0.0.0:5432
+      - PATRONI_POSTGRESQL_CONNECT_ADDRESS=${HOST_IP}:5432
+      - PATRONI_SUPERUSER_USERNAME=postgres
+      - PATRONI_SUPERUSER_PASSWORD=${POSTGRES_PASSWORD}
+      - PATRONI_REPLICATION_USERNAME=replicator
+      - PATRONI_REPLICATION_PASSWORD=${REPLICATION_PASSWORD}
+    ports:
+      - "5432:5432"
+      - "8008:8008"
+    volumes:
+      - postgres_data:/home/postgres/pgroot
+    restart: unless-stopped
+    networks:
+      - keycloak-net
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1.4
+    container_name: keycloak
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://${VM1_IP}:5432,${VM2_IP}:5432/${POSTGRES_DB}?targetServerType=master&loadBalanceHosts=true
+      - KC_DB_USERNAME=${POSTGRES_USER}
+      - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
+      - KC_HOSTNAME=${VIP}
+      - KC_HOSTNAME_STRICT=false
+      - KC_HTTP_ENABLED=true
+      - KC_HTTP_PORT=8080
+      - KC_PROXY=passthrough
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+    command: start --auto-build
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      - patroni
+    networks:
+      - keycloak-net
+
+volumes:
+  postgres_data:
+
+networks:
+  keycloak-net:
+    driver: bridge
