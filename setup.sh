@@ -48,8 +48,13 @@ if [ "$ROLE" == "app" ]; then
     echo -e "${YELLOW}Установка UCARP...${NC}"
     sudo apt install -y ucarp
     
-    # Создание конфига UCARP
-    sudo mkdir -p /etc/ucarp
+    # Создание папки и копирование скриптов
+    sudo mkdir -p /usr/local/bin /etc/ucarp
+    sudo cp ucarp/vip-up.sh /usr/local/bin/
+    sudo cp ucarp/vip-down.sh /usr/local/bin/
+    sudo chmod +x /usr/local/bin/vip-up.sh /usr/local/bin/vip-down.sh
+    
+    # Создание пароля
     echo "$UCARP_PASSWORD" | sudo tee /etc/ucarp/ucarp.pass > /dev/null
     sudo chmod 600 /etc/ucarp/ucarp.pass
     
@@ -62,44 +67,14 @@ if [ "$ROLE" == "app" ]; then
         SKEW="ExecStartPre=/bin/sleep 5"
     fi
     
-    sudo tee /etc/systemd/system/ucarp.service > /dev/null <<EOF
-[Unit]
-Description=UCARP IP Failover
-After=network.target
-
-[Service]
-Type=forking
-User=root
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
-$SKEW
-ExecStart=/usr/sbin/ucarp --interface=ens33 --srcip=$HOST_IP --vhid=$UCARP_VHID --passfile=/etc/ucarp/ucarp.pass --addr=$VIP --upscript=/usr/local/bin/vip-up.sh --downscript=/usr/local/bin/vip-down.sh --preempt --advbase=1 --deadratio=2 $PRIORITY --daemonize
-ExecStop=/usr/bin/pkill -f "ucarp.*vhid=$UCARP_VHID"
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Создание скриптов для UCARP
-    sudo tee /usr/local/bin/vip-up.sh > /dev/null <<'EOF'
-#!/bin/bash
-INTERFACE=$1
-VIP=$2
-ip addr add $VIP/24 dev $INTERFACE
-logger "UCARP: VIP $VIP added on $INTERFACE"
-EOF
-
-    sudo tee /usr/local/bin/vip-down.sh > /dev/null <<'EOF'
-#!/bin/bash
-INTERFACE=$1
-VIP=$2
-ip addr del $VIP/24 dev $INTERFACE 2>/dev/null
-logger "UCARP: VIP $VIP removed from $INTERFACE"
-EOF
-
-    sudo chmod +x /usr/local/bin/vip-up.sh /usr/local/bin/vip-down.sh
+    # Генерация systemd сервиса из шаблона
+    sed -e "s/{{HOST_IP}}/$HOST_IP/g" \
+        -e "s/{{UCARP_VHID}}/$UCARP_VHID/g" \
+        -e "s/{{VIP}}/$VIP/g" \
+        -e "s/{{PRIORITY}}/$PRIORITY/g" \
+        -e "s/{{SKEW}}/$SKEW/g" \
+        ucarp/ucarp.service.template | sudo tee /etc/systemd/system/ucarp.service > /dev/null
+    
     sudo systemctl daemon-reload
     sudo systemctl enable ucarp
 fi
