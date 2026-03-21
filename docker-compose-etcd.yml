@@ -3,7 +3,7 @@ version: '3.8'
 
 services:
   etcd:
-    image: quay.io/coreos/etcd:latest
+    image: rancher/etcd:v3.4.13-k3s1
     container_name: etcd
     environment:
       - ETCD_NAME=vm3

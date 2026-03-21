@@ -3,7 +3,7 @@ version: '3.8'
 
 services:
   patroni:
-    image: ghcr.io/zalando/spilo:16
+    image: ongres/patroni:latest
     container_name: patroni
     environment:
       - SCOPE=keycloak_db
